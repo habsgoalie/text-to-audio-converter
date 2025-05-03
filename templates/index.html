@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB/PDF to MP3 Converter</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: -10px; /* Reduce space below label */
+        }
+        input[type="file"], select {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            width: 100%; /* Make inputs fill container width */
+            box-sizing: border-box; /* Include padding in width */
+        }
+        button {
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #e9ecef;
+            min-height: 50px; /* Ensure space for messages */
+            word-wrap: break-word; /* Prevent long messages from overflowing */
+        }
+        #status.processing {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        #status.complete {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        #status.error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        #download-link {
+            display: block; /* Make it block for better spacing */
+            margin-top: 10px;
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+         #download-link:hover {
+            background-color: #218838;
+         }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EPUB/PDF to MP3 Converter</h1>
+
+        <form id="upload-form">
+            <label for="file">Choose EPUB or PDF file:</label>
+            <input type="file" id="file" name="file" accept=".epub,.pdf" required>
+
+            <label for="voice">Select Voice:</label>
+            <select id="voice" name="voice" required>
+                {% for display_name, short_name in voices %}
+                    <option value="{{ short_name }}" {% if short_name == default_voice %}selected{% endif %}>
+                        {{ display_name }} (en-US Neural)
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" id="submit-button">Convert to MP3</button>
+        </form>
+
+        <div id="status">
+            Select a file and voice, then click 'Convert'.
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const statusDiv = document.getElementById('status');
+        const submitButton = document.getElementById('submit-button');
+        let pollInterval; // To store the interval ID for polling
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevent default form submission
+
+            // Clear previous status and disable button
+            clearStatus();
+            submitButton.disabled = true;
+            submitButton.textContent = 'Uploading...';
+            statusDiv.textContent = 'Uploading file...';
+            statusDiv.className = 'processing'; // Set initial processing style
+
+            const formData = new FormData(form);
+            const fileInput = document.getElementById('file');
+
+            // Basic file size check (browser-side, server validates too)
+            if (fileInput.files.length > 0) {
+                const fileSize = fileInput.files[0].size;
+                const maxSize = 50 * 1024 * 1024; // 50MB (sync with Flask config)
+                if (fileSize > maxSize) {
+                    showError('File is too large. Maximum size is 50MB.');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Convert to MP3';
+                    return;
+                }
+            } else {
+                 showError('No file selected.');
+                 submitButton.disabled = false;
+                 submitButton.textContent = 'Convert to MP3';
+                 return;
+            }
+
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData, // Includes the selected voice
+                });
+
+                submitButton.textContent = 'Processing...'; // Update button text
+
+                if (!response.ok) {
+                    let errorMsg = `Upload failed: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = `Upload failed: ${errorData.error || response.statusText}`;
+                    } catch (e) { /* Ignore if response is not JSON */ }
+                    throw new Error(errorMsg);
+                }
+
+                const data = await response.json();
+                if (data.task_id) {
+                    statusDiv.textContent = 'File uploaded. Starting conversion... Task ID: ' + data.task_id;
+                    pollStatus(data.task_id); // Start polling for status
+                } else {
+                    throw new Error(data.error || 'Failed to start conversion task.');
+                }
+
+            } catch (error) {
+                console.error('Upload Error:', error);
+                showError(`Upload failed: ${error.message}`);
+                submitButton.disabled = false; // Re-enable button on error
+                submitButton.textContent = 'Convert to MP3';
+            }
+        });
+
+        function pollStatus(taskId) {
+            // Clear any existing polling interval
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/status/${taskId}`);
+                    if (!response.ok) {
+                        // Handle server errors during polling
+                        throw new Error(`Status check failed: ${response.statusText}`);
+                    }
+                    const data = await response.json();
+
+                    statusDiv.textContent = `Status: ${data.status} - ${data.message || ''}`;
+                    statusDiv.className = data.status; // Update styling based on status
+
+                    if (data.status === 'complete') {
+                        clearInterval(pollInterval); // Stop polling
+                        submitButton.disabled = false; // Re-enable button
+                        submitButton.textContent = 'Convert Another File';
+                        showDownloadLink(data.download_url, data.filename);
+                    } else if (data.status === 'error') {
+                        clearInterval(pollInterval); // Stop polling
+                        submitButton.disabled = false; // Re-enable button
+                        submitButton.textContent = 'Try Again';
+                        showError(`Conversion failed: ${data.error_details || data.message || 'Unknown error'}`);
+                    }
+                    // Keep polling if status is 'queued' or 'processing'
+
+                } catch (error) {
+                    console.error('Polling Error:', error);
+                    showError(`Error checking status: ${error.message}`);
+                    clearInterval(pollInterval); // Stop polling on error
+                    submitButton.disabled = false; // Re-enable button
+                    submitButton.textContent = 'Try Again';
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        function showDownloadLink(url, filename) {
+            // Remove any existing link first
+            const existingLink = document.getElementById('download-link');
+            if (existingLink) {
+                existingLink.remove();
+            }
+
+            const link = document.createElement('a');
+            link.id = 'download-link';
+            link.href = url;
+            link.textContent = `Download ${filename || 'output.mp3'}`;
+            link.download = filename || 'output.mp3'; // Suggest filename
+            statusDiv.appendChild(link); // Append link to the status div
+        }
+
+        function showError(message) {
+            statusDiv.textContent = message;
+            statusDiv.className = 'error';
+            // Clear any download link if an error occurs
+             const existingLink = document.getElementById('download-link');
+            if (existingLink) {
+                existingLink.remove();
+            }
+        }
+
+        function clearStatus() {
+             statusDiv.textContent = 'Select a file and voice, then click \'Convert\'.'; // Updated initial text
+             statusDiv.className = ''; // Remove status classes
+             // Clear any download link
+             const existingLink = document.getElementById('download-link');
+            if (existingLink) {
+                existingLink.remove();
+            }
+             // Clear polling interval if it exists
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+    </script>
+</body>
+</html>
