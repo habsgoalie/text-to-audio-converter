@@ -1,0 +1,25 @@
+# Ignore Python virtual environment
+venv/
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore output audio files
+output_audio/
+*.mp3
+
+# Ignore temporary files
+*.tmp
+*.log
+
+# Ignore environment configuration files
+.env
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
