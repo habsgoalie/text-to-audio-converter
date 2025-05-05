@@ -1,111 +1,80 @@
-# EPUB/PDF to MP3 Converter
+# EPUB/PDF to MP3 Web Converter
 
-This Python script converts text content from EPUB or PDF files into a single MP3 audio file using Microsoft Edge's high-quality online text-to-speech (TTS) service via the `edge-tts` library. It handles large files by splitting the text into chunks for TTS processing and then merges the resulting audio chunks into one final MP3 file.
+This project provides a simple web application, run via Docker, that converts text content from uploaded EPUB or PDF files into a downloadable MP3 audio file. It uses Microsoft Edge's high-quality online text-to-speech (TTS) service via the `edge-tts` library.
 
 ## Features
 
+* Web-based interface for easy file upload and conversion.
 * Supports EPUB and PDF input files.
 * Uses Microsoft Edge's online TTS for high-quality voices.
-* Chunks large text files to avoid TTS limits and improve reliability.
-* Merges audio chunks into a single MP3 output file per input file.
-* Allows selection of different TTS voices.
-* Command-line interface for easy use.
+* Allows selection of different en-US neural voices.
+* Handles large files by chunking text for TTS processing.
+* Merges audio chunks into a single downloadable MP3 file.
+* Packaged as a Docker container for easy deployment and sharing.
 
 ## Prerequisites
 
-1.  **Python:** Version 3.7 or newer is required.
-2.  **ffmpeg:** This is essential for merging the audio chunks. `pydub`, the library used for merging, relies on it.
-    * Download and install `ffmpeg` from the official website: <https://ffmpeg.org/download.html>
-    * **Crucially:** Ensure the directory containing `ffmpeg.exe` (on Windows) or `ffmpeg` (on macOS/Linux) is added to your system's **PATH environment variable** so the script can find it. You can verify this by opening a *new* terminal/command prompt and typing `ffmpeg -version`.
-3.  **pip:** Python's package installer (usually comes with Python).
+1.  **Docker:** You must have Docker installed and running on your machine. Download from <https://www.docker.com/products/docker-desktop/>.
 
-## Setup
+## Running the Application (Using Pre-built Docker Image)
 
-1.  **Get the Code:** Download or clone the script (`convert_to_audio_merged.py`) and the `requirements.txt` file into a dedicated project directory (e.g., `text_to_audio_converter`).
-2.  **Create a Virtual Environment:** Open your terminal or command prompt, navigate to the project directory, and create a virtual environment. This isolates the project's dependencies.
-    * **macOS/Linux:**
-        ```bash
-        cd path/to/text_to_audio_converter
-        python3 -m venv venv
-        source venv/bin/activate
-        ```
-    * **Windows (Command Prompt):**
-        ```bash
-        cd path\to\text_to_audio_converter
-        python -m venv venv
-        venv\Scripts\activate.bat
-        ```
-    * **Windows (PowerShell):**
-        ```bash
-        cd path\to\text_to_audio_converter
-        python -m venv venv
-        .\venv\Scripts\Activate.ps1
-        ```
-        *(Note: You might need to adjust PowerShell's execution policy first: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`)*
+This is the easiest way to run the application, as it uses the pre-built image directly from the GitHub Container Registry (ghcr.io).
 
-    You should see `(venv)` appear at the beginning of your terminal prompt, indicating the environment is active.
-3.  **Install Dependencies:** With the virtual environment active, install the required Python libraries using the `requirements.txt` file:
+1.  **Pull the Docker Image:** Open your terminal or command prompt and pull the latest image:
     ```bash
-    pip install -r requirements.txt
+    docker pull ghcr.io/habsgoalie/text-to-audio-converter:latest
     ```
-    *(This installs `edge-tts`, `ebooklib`, `beautifulsoup4`, `PyMuPDF`, and `pydub`).*
-4.  **Windows Specific Dependency (Optional but recommended):** If you encounter import errors related to `audioop` or `pyaudioop` when running the script on Windows (even with ffmpeg installed), you might need to install a helper package:
+    *(Note: If the package is private on GitHub, you might need to log in first using `docker login ghcr.io`)*
+
+2.  **Run the Docker Container:** Once the image is downloaded, start the container:
     ```bash
-    pip install audioop-lts
+    docker run -p 5000:5000 --rm --name tts-web ghcr.io/habsgoalie/text-to-audio-converter:latest
     ```
-    *(Update `requirements.txt` afterwards if you add this: `pip freeze > requirements.txt`)*
+    * `-p 5000:5000`: Maps port 5000 inside the container to port 5000 on your host machine.
+    * `--rm`: Automatically removes the container when you stop it (e.g., by pressing `Ctrl+C` in the terminal where it's running).
+    * `--name tts-web`: Assigns a convenient name to the running container.
+    * `ghcr.io/habsgoalie/text-to-audio-converter:latest`: The full name of the image to run.
 
-## Usage
+3.  **Access the Web App:** Open your web browser and navigate to:
+    <http://localhost:5000>
 
-Run the script from your terminal or command prompt while the virtual environment is active.
+## Using the Web Interface
 
-```bash
-python convert_to_audio_merged.py [options] input_file
-```
+1.  **Upload File:** Click "Choose File" and select an EPUB or PDF file from your computer.
+2.  **Select Voice:** Choose your preferred voice from the dropdown menu (defaults to Steffan).
+3.  **Convert:** Click the "Convert to MP3" button.
+4.  **Wait:** The status area will show the progress ("Uploading...", "Processing...", "Converting chunk X/Y...", "Merging..."). This may take some time depending on the file size.
+5.  **Download:** Once the status shows "complete", a download link for the generated MP3 file will appear. Click the link to save the audio file.
 
-**Arguments:**
+## Building from Source (Alternative)
 
-* `input_file`: (Required) The path to the input EPUB or PDF file you want to convert.
+If you prefer to build the image yourself:
 
-**Options:**
-
-* `-o OUTPUT`, `--output OUTPUT`:
-    * Specifies the path for the final output MP3 file.
-    * If omitted, the output file will be saved in a sub-directory named `output_audio/` with a name based on the input file (e.g., `output_audio/my_book.mp3`).
-* `-v VOICE`, `--voice VOICE`:
-    * Specifies the TTS voice to use. Find available voices using `--list-voices`.
-    * Default: `en-US-AriaNeural`
-* `--list-voices`:
-    * Lists all available TTS voices supported by `edge-tts` and exits. Use this to find the `ShortName` for the `--voice` option.
-* `--no-chunking`:
-    * Disables text chunking and merging. The script will attempt to process the entire file text in one go.
-    * **Warning:** This may fail for large files due to TTS service limits, and no merging will occur. Use with caution.
-* `-h`, `--help`:
-    * Shows the help message describing the arguments and options.
-
-**Examples:**
-
-1.  **Convert an EPUB with default settings:**
+1.  **Get the Code:** Clone or download the project files:
     ```bash
-    python convert_to_audio_merged.py "My Book Title.epub"
+    git clone [https://github.com/habsgoalie/text-to-audio-converter.git](https://github.com/habsgoalie/text-to-audio-converter.git)
+    cd text-to-audio-converter
     ```
-    *(Output will be in `output_audio/My Book Title.mp3`)*
-2.  **Convert a PDF and specify the output file name:**
+2.  **Build the Docker Image:**
     ```bash
-    python convert_to_audio_merged.py document.pdf -o my_audiobook.mp3
+    docker build -t text-to-audio-converter-web .
     ```
-3.  **Convert using a specific voice (British English):**
+3.  **Run the Docker Container:**
     ```bash
-    python convert_to_audio_merged.py report.pdf --voice en-GB-SoniaNeural
-    ```
-4.  **List available voices:**
-    ```bash
-    python convert_to_audio_merged.py --list-voices
+    docker run -p 5000:5000 --rm --name tts-web text-to-audio-converter-web
     ```
 
-## Output
+## Technology Stack
 
-* The script creates temporary files in a system temporary directory during processing. These are automatically deleted upon successful completion.
-* If merging fails (e.g., ffmpeg issue), the temporary chunk files might be kept for debugging. The script will print the path to the temporary directory in this case.
-* The final, merged MP3 file is saved either to the path specified with `-o` or in the `output_audio` sub-directory by default.
+* **Backend:** Python, Flask
+* **Text-to-Speech:** `edge-tts` library (using Microsoft Edge online TTS)
+* **EPUB Parsing:** `EbookLib`, `BeautifulSoup4`
+* **PDF Parsing:** `PyMuPDF`
+* **Audio Merging:** `ffmpeg` (called via `subprocess`)
+* **Containerization:** Docker
+
+## Notes
+
+* Uploaded files and generated MP3s are stored temporarily within the running Docker container and are typically removed when the container stops (due to the `--rm` flag).
+* There is a default file upload size limit of 50MB, configured in `app.py`.
 
