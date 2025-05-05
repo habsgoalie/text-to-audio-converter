@@ -224,15 +224,4 @@ def download_file(task_id):
     except Exception as e:
         logger.error(f"Error during file download for task {task_id}: {e}", exc_info=True)
         return "Error serving file.", 500
-
-# --- Main Execution ---
-if __name__ == '__main__':
-    # Check ffmpeg on startup
-    if not tts_processor.check_and_set_ffmpeg_paths():
-         logger.critical("FATAL: ffmpeg/ffprobe not found or configured correctly. The application may not function.")
-         # Decide if you want to exit or just warn
-         # sys.exit("Exiting due to missing ffmpeg/ffprobe.")
-
-    # Consider using Waitress or Gunicorn instead of development server for production
-    logger.info("Starting Flask development server...")
-    app.run(debug=False, host='0.0.0.0', port=5000) # debug=False for background threads
+    
