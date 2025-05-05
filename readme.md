@@ -66,7 +66,7 @@ If you prefer to build the image yourself:
 
 ## Technology Stack
 
-* **Backend:** Python, Flask
+* **Backend:** Python, Waitress
 * **Text-to-Speech:** `edge-tts` library (using Microsoft Edge online TTS)
 * **EPUB Parsing:** `EbookLib`, `BeautifulSoup4`
 * **PDF Parsing:** `PyMuPDF`
