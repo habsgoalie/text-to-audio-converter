@@ -5,7 +5,7 @@ FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 \
     # Set path for Flask app files within the container
     FLASK_APP_DIR=/app \
-    # Default Waitress settings (can be overridden at runtime)
+    # Default Waitress settings (can be overridden at runtime or via docker-compose)
     WAITRESS_HOST=0.0.0.0 \
     WAITRESS_PORT=5000 \
     WAITRESS_THREADS=4
@@ -29,17 +29,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container
-# Ensure templates folder is copied
+# Ensure templates folder and entrypoint script are copied
 COPY . .
+
+# Make the entrypoint script executable
+RUN chmod +x entrypoint.sh
 
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
 
-# Define the command to run the application using Waitress
-# waitress-serve imports the 'app' object from the 'app.py' module (app:app)
-CMD ["waitress-serve", \
-     "--host=${WAITRESS_HOST}", \
-     "--port=${WAITRESS_PORT}", \
-     "--threads=${WAITRESS_THREADS}", \
-     "app:app"]
+# Define the command to run the application using the entrypoint script
+CMD ["./entrypoint.sh"]
 
