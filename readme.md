@@ -28,10 +28,9 @@ This is the easiest way to run the application, as it uses the pre-built image d
 
 2.  **Run the Docker Container:** Once the image is downloaded, start the container:
     ```bash
-    docker run -p 5000:5000 --rm --name tts-web ghcr.io/habsgoalie/text-to-audio-converter:latest
+    docker run -d -p 5000:5000 --name tts-web ghcr.io/habsgoalie/text-to-audio-converter:latest
     ```
     * `-p 5000:5000`: Maps port 5000 inside the container to port 5000 on your host machine.
-    * `--rm`: Automatically removes the container when you stop it (e.g., by pressing `Ctrl+C` in the terminal where it's running).
     * `--name tts-web`: Assigns a convenient name to the running container.
     * `ghcr.io/habsgoalie/text-to-audio-converter:latest`: The full name of the image to run.
 
